@@ -6,7 +6,24 @@ static Hysteresis fanCtl(TEMP_FAN_ON, TEMP_FAN_OFF, true);     // liga ao subir
 static Hysteresis ledCtl(LIGHT_ON_PCT, LIGHT_OFF_PCT, false);  // liga ao descer
 
 static bool muted = false;
-static uint32_t lastBeepMs = 0;
+
+// ---- Buzzer via LEDC (PWM do ESP32), inicializado uma única vez ----
+constexpr uint8_t BUZZER_CHANNEL = 0;
+static bool     buzzerActive = false;
+static uint32_t buzzerOffAt  = 0;
+static uint32_t lastBeepMs   = 0;
+
+static void buzzerStart(uint32_t freq, uint32_t durationMs) {
+  ledcWriteTone(BUZZER_CHANNEL, freq);
+  buzzerOffAt = millis() + durationMs;
+  buzzerActive = true;
+}
+
+static void buzzerStop() {
+  if (!buzzerActive) return;          // só desliga se estiver tocando
+  ledcWrite(BUZZER_CHANNEL, 0);
+  buzzerActive = false;
+}
 
 static void writeRelay(bool on) {
   digitalWrite(PIN_RELAY, (on ^ RELAY_ACTIVE_LOW) ? HIGH : LOW);
@@ -15,9 +32,12 @@ static void writeRelay(bool on) {
 void controlBegin() {
   pinMode(PIN_RELAY, OUTPUT);
   pinMode(PIN_LED, OUTPUT);
-  pinMode(PIN_BUZZER, OUTPUT);
   writeRelay(false);
   digitalWrite(PIN_LED, LOW);
+
+  ledcSetup(BUZZER_CHANNEL, 2000, 8);       // canal 0, 2 kHz, 8 bits
+  ledcAttachPin(PIN_BUZZER, BUZZER_CHANNEL);
+  ledcWrite(BUZZER_CHANNEL, 0);             // começa em silêncio
 }
 
 void controlToggleMute() { muted = !muted; }
@@ -57,18 +77,21 @@ void controlUpdate(const SensorData& d, ActuatorState& a) {
   writeRelay(a.fan);
   digitalWrite(PIN_LED, a.led ? HIGH : LOW);
 
+  // 5) Buzzer
   const uint32_t now = millis();
+  if (buzzerActive && (int32_t)(now - buzzerOffAt) >= 0) buzzerStop();  // fim do bipe
+
   if (s == AlarmState::CRITICAL && !muted) {
-    if (now - lastBeepMs >= 1000) {         // bipe de 200 ms a cada 1 s
+    if (now - lastBeepMs >= 1000) {          // bipe de 200 ms a cada 1 s
       lastBeepMs = now;
-      tone(PIN_BUZZER, 2000, 200);
+      buzzerStart(2000, 200);
     }
   } else if (s == AlarmState::WARNING && !muted) {
-    if (now - lastBeepMs >= 10000) {        // bipe curto a cada 10 s
+    if (now - lastBeepMs >= 10000) {         // bipe curto a cada 10 s
       lastBeepMs = now;
-      tone(PIN_BUZZER, 1000, 80);
+      buzzerStart(1000, 80);
     }
   } else {
-    noTone(PIN_BUZZER);
+    buzzerStop();                            // alarme OK ou silenciado
   }
 }
