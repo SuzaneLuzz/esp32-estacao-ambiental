@@ -166,6 +166,6 @@ A tela 3 do OLED mostra os valores brutos do ADC. Para calibrar:
 ## 👩‍💻 Autora
 
 **Suzane Luz** — Engenharia da Computação
-[LinkedIn](https://linkedin.com/in/suzaneazevedoluz) · [GitHub](https://github.com/SuzaneLuzz) · [ArtStation](https://znii.artstation.com)
+[LinkedIn](https://linkedin.com/in/suzaneazevedoluz) · [GitHub](https://github.com/SuzaneLuzz)
 
 Licença [MIT](LICENSE).
